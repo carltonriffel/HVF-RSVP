@@ -48,9 +48,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json<LookupSuccess>({ ok: true, attendee });
   } catch (err) {
-    console.error('lookup error:', err);
-    return NextResponse.json<ApiError>(
-      { ok: false, error: 'Something went wrong looking up your invitation. Please try again.' },
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('lookup error:', detail);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Something went wrong looking up your invitation. Please try again.',
+        detail,
+      },
       { status: 500 }
     );
   }

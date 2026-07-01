@@ -67,9 +67,14 @@ export async function POST(request: NextRequest) {
       message: 'Your RSVP has been received.',
     });
   } catch (err) {
-    console.error('submit error:', err);
-    return NextResponse.json<ApiError>(
-      { ok: false, error: 'We could not save your RSVP. Your answers are safe — please try again.' },
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('submit error:', detail);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'We could not save your RSVP. Your answers are safe — please try again.',
+        detail,
+      },
       { status: 500 }
     );
   }
