@@ -205,6 +205,34 @@ export default function RsvpForm({
       {/* ---------------- Step: Attendance ---------------- */}
       {currentStep === 'attendance' && (
         <FormStep title="Attendance">
+          <RadioGroup
+            label="Will you be joining us?"
+            name="rsvpStatus"
+            options={[ATTENDING, PARTIAL, UNABLE]}
+            value={responses.rsvpStatus}
+            onChange={(v) => {
+              setField('rsvpStatus', v);
+              // Attending defaults to Both Days (hidden); Partial asks; Unable clears.
+              if (v === ATTENDING) setField('attendingDays', 'Both Days');
+              else setField('attendingDays', '');
+            }}
+          />
+          {responses.rsvpStatus === PARTIAL && (
+            <RadioGroup
+              label="Which day(s) will you attend?"
+              name="attendingDays"
+              options={['Monday', 'Tuesday', 'Both Days']}
+              value={responses.attendingDays}
+              onChange={(v) => setField('attendingDays', v)}
+            />
+          )}
+          <RadioGroup
+            label="Which best describes your work?"
+            name="industry"
+            options={['Wedding', 'Corporate', 'Both']}
+            value={responses.industry}
+            onChange={(v) => setField('industry', v)}
+          />
           <TextField
             label="Full name"
             autoComplete="name"
@@ -234,13 +262,6 @@ export default function RsvpForm({
             placeholder="423-555-1234"
             value={responses.phone}
             onChange={(v) => setField('phone', formatPhone(v))}
-          />
-          <RadioGroup
-            label="Which best describes your work?"
-            name="industry"
-            options={['Wedding', 'Corporate', 'Both']}
-            value={responses.industry}
-            onChange={(v) => setField('industry', v)}
           />
           <div className="field">
             <span className="field-label">Mailing address</span>
@@ -274,27 +295,6 @@ export default function RsvpForm({
               onChange={(v) => setField('zip', v)}
             />
           </div>
-          <RadioGroup
-            label="Will you be joining us?"
-            name="rsvpStatus"
-            options={[ATTENDING, PARTIAL, UNABLE]}
-            value={responses.rsvpStatus}
-            onChange={(v) => {
-              setField('rsvpStatus', v);
-              // Attending defaults to Both Days (hidden); Partial asks; Unable clears.
-              if (v === ATTENDING) setField('attendingDays', 'Both Days');
-              else setField('attendingDays', '');
-            }}
-          />
-          {responses.rsvpStatus === PARTIAL && (
-            <RadioGroup
-              label="Which day(s) will you attend?"
-              name="attendingDays"
-              options={['Monday', 'Tuesday', 'Both Days']}
-              value={responses.attendingDays}
-              onChange={(v) => setField('attendingDays', v)}
-            />
-          )}
         </FormStep>
       )}
 
