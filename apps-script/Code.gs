@@ -523,9 +523,18 @@ function sendConfirmationEmail(att) {
 function onSheetEdit(e) {
   try {
     var range = e && e.range;
-    if (!range) return;
+    if (!range) {
+      // No range means this is an "On change" trigger (or a manual run). We
+      // can't tell which cell changed, so scan for checked-but-unsent invites.
+      Logger.log('invite: no range on event — using scan fallback (tip: set the trigger to "On edit")');
+      sendPendingInvites_();
+      return;
+    }
     var sheet = range.getSheet();
-    if (sheet.getName() !== SHEET_NAME) return;
+    if (sheet.getName() !== SHEET_NAME) {
+      Logger.log('invite: edit was on sheet "' + sheet.getName() + '", not "' + SHEET_NAME + '"');
+      return;
+    }
     var row = range.getRow();
     if (row === 1) return; // header
 
@@ -535,24 +544,84 @@ function onSheetEdit(e) {
       .map(function (h) { return normalizeHeader(String(h)); });
 
     var siCol = colIndex(header, 'send_invite');
-    if (siCol < 0) return;
-    if (range.getColumn() !== siCol + 1) return; // edit wasn't the send_invite column
-    if (range.getValue() !== true) return; // only act when it becomes checked
+    if (siCol < 0) {
+      Logger.log('invite: no "send_invite" column found. Headers: ' + header.join(', '));
+      return;
+    }
+    if (range.getColumn() !== siCol + 1) {
+      Logger.log('invite: edited column ' + range.getColumn() + ' is not send_invite (col ' + (siCol + 1) + ')');
+      return;
+    }
+    var checkedVal = range.getValue();
+    if (checkedVal !== true) {
+      Logger.log('invite: send_invite value is not checked (got: ' + checkedVal + ')');
+      return;
+    }
 
     var rowValues = sheet.getRange(row, 1, 1, header.length).getValues()[0];
     var att = rowToAttendee(header, rowValues);
-    if (!att.email) return;
+    if (!att.email) {
+      Logger.log('invite: row ' + row + ' has no primary_email — nothing to send to');
+      return;
+    }
 
     // If an invite_sent_at column exists and is already filled, don't resend.
     var sentCol = colIndex(header, 'invite_sent_at');
-    if (sentCol >= 0 && String(rowValues[sentCol] || '').trim() !== '') return;
+    if (sentCol >= 0 && String(rowValues[sentCol] || '').trim() !== '') {
+      Logger.log('invite: already sent to ' + att.email + ' (invite_sent_at is set)');
+      return;
+    }
 
+    Logger.log('invite: sending to ' + att.email + ' (name: ' + att.name + ')');
     sendInviteEmail(att);
+    Logger.log('invite: MailApp.sendEmail completed for ' + att.email);
 
     if (sentCol >= 0) {
       sheet.getRange(row, sentCol + 1).setValue(new Date().toISOString());
     }
   } catch (err) {
-    if (typeof console !== 'undefined' && console.log) console.log('onSheetEdit error: ' + err);
+    // Surface the real error (e.g. an authorization problem) instead of hiding it.
+    Logger.log('invite ERROR: ' + (err && err.stack ? err.stack : err));
+  }
+}
+
+/**
+ * Fallback for "On change" triggers (no e.range): scan every row and send an
+ * invite to anyone whose send_invite is checked but who hasn't been sent one.
+ * Requires an `invite_sent_at` column so we don't resend on every change.
+ */
+function sendPendingInvites_() {
+  try {
+    var d = readData();
+    var siCol = colIndex(d.header, 'send_invite');
+    var sentCol = colIndex(d.header, 'invite_sent_at');
+    if (siCol < 0) {
+      Logger.log('invite: no "send_invite" column found. Headers: ' + d.header.join(', '));
+      return;
+    }
+    if (sentCol < 0) {
+      Logger.log(
+        'invite: the scan fallback needs an "invite_sent_at" column to avoid ' +
+          'resending on every change. Add that column, OR set the trigger event type to "On edit".'
+      );
+      return;
+    }
+    for (var i = 0; i < d.rows.length; i++) {
+      if (isEmptyRow(d.rows[i])) continue;
+      var checked = d.rows[i][siCol] === true;
+      var alreadySent = String(d.rows[i][sentCol] || '').trim() !== '';
+      if (!checked || alreadySent) continue;
+      var att = rowToAttendee(d.header, d.rows[i]);
+      if (!att.email) {
+        Logger.log('invite: row ' + (i + 2) + ' is checked but has no primary_email');
+        continue;
+      }
+      Logger.log('invite: (scan) sending to ' + att.email);
+      sendInviteEmail(att);
+      d.sheet.getRange(i + 2, sentCol + 1).setValue(new Date().toISOString());
+      Logger.log('invite: (scan) sent to ' + att.email);
+    }
+  } catch (err) {
+    Logger.log('invite scan ERROR: ' + (err && err.stack ? err.stack : err));
   }
 }

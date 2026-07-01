@@ -232,36 +232,39 @@ export default function RsvpForm({
             value={responses.industry}
             onChange={(v) => setField('industry', v)}
           />
-          <TextField
-            label="Full name"
-            autoComplete="name"
-            value={responses.name}
-            onChange={(v) => setField('name', v)}
-          />
-          <TextField
-            label="Company"
-            autoComplete="organization"
-            value={responses.company}
-            onChange={(v) => setField('company', v)}
-          />
-          <TextField
-            label="Email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            value={responses.email}
-            onChange={(v) => setField('email', v)}
-          />
-          <TextField
-            label="Phone"
-            hint="So we can reach you with day-of details."
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="423-555-1234"
-            value={responses.phone}
-            onChange={(v) => setField('phone', formatPhone(v))}
-          />
+          <div className="field-grid">
+            <TextField
+              label="Full name"
+              autoComplete="name"
+              value={responses.name}
+              onChange={(v) => setField('name', v)}
+            />
+            <TextField
+              label="Company"
+              autoComplete="organization"
+              value={responses.company}
+              onChange={(v) => setField('company', v)}
+            />
+          </div>
+          <div className="field-grid">
+            <TextField
+              label="Email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={responses.email}
+              onChange={(v) => setField('email', v)}
+            />
+            <TextField
+              label="Phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="423-555-1234"
+              value={responses.phone}
+              onChange={(v) => setField('phone', formatPhone(v))}
+            />
+          </div>
           <div className="field">
             <span className="field-label">Mailing address</span>
             <span className="hint">Where we can send any physical mail or details.</span>
