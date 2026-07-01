@@ -37,6 +37,11 @@ var SHARED_SECRET = 'CHANGE_ME_to_a_long_random_string';
 // The tab (worksheet) that holds invites & responses.
 var SHEET_NAME = 'Invites_RSVPs';
 
+// The PUBLIC URL of your deployed RSVP app (Webflow Cloud), used for the buttons
+// in the invite & confirmation emails. Include the mount path, no trailing slash.
+// Example: 'https://your-site.com/planner-rsvp'
+var APP_URL = 'https://happyvalleyfarms.com/planner-rsvp';
+
 // ---------------------------------------------------------------------------
 // Entry points
 // ---------------------------------------------------------------------------
@@ -320,8 +325,234 @@ function doSubmit(params) {
     setCol('last_updated', now);
 
     d.sheet.getRange(rowNumber, 1, 1, d.header.length).setValues([rowValues]);
+
+    // Email the guest a summary of their submission. Never fail the save if the
+    // email can't be sent.
+    try {
+      sendConfirmationEmail(rowToAttendee(d.header, rowValues));
+    } catch (mailErr) {
+      if (typeof console !== 'undefined' && console.log) console.log('confirm mail: ' + mailErr);
+    }
+
     return { ok: true };
   } finally {
     lock.releaseLock();
+  }
+}
+
+// ===========================================================================
+// EMAILS
+// ---------------------------------------------------------------------------
+// 1. Invite email — sent when the `send_invite` checkbox is ticked.
+//      Set up once: Apps Script editor → Triggers (clock icon) → Add Trigger →
+//      Function: onSheetEdit, Event source: From spreadsheet, Type: On edit →
+//      Save → authorize. (An installable trigger is required; a simple onEdit
+//      cannot send email.) Optional: add an `invite_sent_at` column and the
+//      script will stamp it and never double-send.
+// 2. Confirmation email — sent automatically after each RSVP submission.
+// Both use APP_URL (set above) for their buttons, with ?email= so the app
+// looks the guest up immediately.
+// ===========================================================================
+
+/** The RSVP link for a guest, pre-loaded with their email. */
+function rsvpLink(email) {
+  return APP_URL + '?email=' + encodeURIComponent(email || '');
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Shared branded email wrapper (logo header + cream card + footer). */
+function emailShell(innerHtml) {
+  var logo =
+    'https://cdn.prod.website-files.com/65df7ac34fd99d356d984e76/6a21a1bbbdba9a37327c439b_Event%20Logo%20over%20horizontal.png';
+  return (
+    '<div style="margin:0;padding:0;background:#0f2417;">' +
+    '<div style="max-width:600px;margin:0 auto;padding:26px 0;font-family:Georgia,\'Times New Roman\',serif;">' +
+    '<div style="text-align:center;padding:6px 24px 18px;">' +
+    '<img src="' + logo + '" alt="Happy Valley Farms" width="200" style="max-width:58%;height:auto;" />' +
+    '</div>' +
+    '<div style="background:#f6f1e4;border-radius:6px;margin:0 16px;padding:32px 30px;color:#26302a;">' +
+    innerHtml +
+    '</div>' +
+    '<div style="text-align:center;color:#9db3a2;font-size:12px;font-style:italic;padding:18px 24px;">' +
+    'Happy Valley Farms · 490 Hutcheson Dr, Rossville GA 30741' +
+    '</div>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+/** A bulletproof-ish gold button. */
+function emailButton(label, url) {
+  return (
+    '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">' +
+    '<tr><td style="border-radius:6px;background:#b9974f;">' +
+    '<a href="' + url + '" style="display:inline-block;padding:13px 32px;font-family:Georgia,serif;' +
+    'font-size:16px;color:#2a2412;text-decoration:none;font-weight:bold;letter-spacing:0.03em;">' +
+    label +
+    '</a></td></tr></table>'
+  );
+}
+
+function firstNameOf(name) {
+  var f = String(name || '').trim().split(/\s+/)[0];
+  return f || 'there';
+}
+
+// ---------------------------------------------------------------------------
+// Invite email
+// ---------------------------------------------------------------------------
+function sendInviteEmail(att) {
+  if (!att || !att.email) return;
+  var first = firstNameOf(att.name);
+  var link = rsvpLink(att.email);
+
+  var inner =
+    '<p style="text-transform:uppercase;letter-spacing:0.22em;font-size:11px;color:#b9974f;text-align:center;margin:0 0 6px;">You are cordially invited</p>' +
+    '<h1 style="text-align:center;font-size:26px;font-weight:500;color:#14311f;margin:0 0 4px;">Event Planner Retreat</h1>' +
+    '<p style="text-align:center;font-style:italic;color:#5a655c;margin:0 0 22px;">A private two-day gathering · Aug 3rd–4th</p>' +
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">Dear ' + escapeHtml(first) + ',</p>' +
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">By now, a printed invitation should have arrived in your mailbox. We wanted to reach out personally — we are so glad to welcome you to Happy Valley Farms, and we can’t wait for you to experience the estate, the farm, and everything we have planned firsthand.</p>' +
+    '<p style="font-size:15px;line-height:1.6;margin:0 0 6px;color:#5a655c;"><strong style="color:#14311f;">What to expect:</strong> Two unhurried days of curated hospitality — farm-to-table dinners, paddleboarding on the river, a helicopter tour over Lula Lake, plein air painting, bouquet crafting, a poolside yoga &amp; sound bath, and the best of Chattanooga’s food and views, all in the company of fellow planners.</p>' +
+    emailButton('RSVP Now', link) +
+    '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:2px 0 0;">Kindly reply by July 13th.</p>';
+
+  MailApp.sendEmail({
+    to: att.email,
+    name: 'Happy Valley Farms',
+    subject: 'You’re Invited — Event Planner Retreat at Happy Valley Farms',
+    htmlBody: emailShell(inner),
+    body:
+      'Dear ' + first + ',\n\nYou are invited to the Event Planner Retreat at Happy Valley Farms, ' +
+      'Aug 3rd–4th. Please RSVP here: ' + link + '\n\nKindly reply by July 13th.',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Confirmation email (summary of what the guest submitted)
+// ---------------------------------------------------------------------------
+function sendConfirmationEmail(att) {
+  if (!att || !att.email) return;
+  var first = firstNameOf(att.name);
+  var link = rsvpLink(att.email);
+  var r = att.responses || {};
+
+  var rows = [];
+  var add = function (label, val) {
+    if (val != null && String(val).trim() !== '') rows.push([label, String(val)]);
+  };
+  add('RSVP', r.rsvpStatus);
+  add('Days', r.attendingDays);
+  add('Arrival', [r.arrivalDate, r.arrivalTime].filter(function (x) { return x; }).join(' · '));
+  add('Departure', [r.departureDate, r.departureTime].filter(function (x) { return x; }).join(' · '));
+  add('Travel', r.travelMode);
+  add('Airport transportation', r.needTransportation);
+  add('Needs lodging', r.needHotel);
+  add('Preferred lodging', r.preferredLodging);
+
+  var labelMap = {
+    picnicPaddleboarding: 'Picnic & Paddleboarding',
+    pleinAirPainting: 'Plein Air Painting',
+    petalParty: 'Petal Party',
+    vegetableHarvesting: 'Vegetable Harvesting',
+    helicopterTour: 'Helicopter Tour',
+    progressiveDinner: 'Progressive Dinner',
+    nightSwim: 'Night Swim',
+    breakfast: 'Breakfast',
+    yogaSoundBath: 'Yoga & Sound Bath',
+    brunchSocial: 'Brunch Social',
+    chattanoogaShuttleTour: 'Chattanooga Shuttle Tour',
+    farewellFeast: 'Farewell Feast',
+  };
+  var A = r.activities || {};
+  var joining = [];
+  Object.keys(labelMap).forEach(function (k) {
+    if (A[k] === 'Yes') joining.push(labelMap[k]);
+  });
+  add('Joining', joining.join(', '));
+  add('Dietary restrictions', r.foodRestrictions);
+  add('Food allergies', r.foodAllergies);
+  add('Alcohol', r.alcoholPreference);
+  add('Notes', r.miscNote);
+
+  var tableRows = rows
+    .map(function (p) {
+      return (
+        '<tr>' +
+        '<td style="padding:7px 0;border-bottom:1px solid #e3dcc7;color:#5a655c;font-size:14px;vertical-align:top;width:44%;">' +
+        escapeHtml(p[0]) +
+        '</td>' +
+        '<td style="padding:7px 0;border-bottom:1px solid #e3dcc7;color:#14311f;font-size:14px;font-weight:500;">' +
+        escapeHtml(p[1]) +
+        '</td></tr>'
+      );
+    })
+    .join('');
+
+  var inner =
+    '<p style="text-transform:uppercase;letter-spacing:0.22em;font-size:11px;color:#b9974f;text-align:center;margin:0 0 6px;">RSVP Received</p>' +
+    '<h1 style="text-align:center;font-size:26px;font-weight:500;color:#14311f;margin:0 0 16px;">Thank you, ' + escapeHtml(first) + '.</h1>' +
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 16px;">We’ve received your RSVP for the Event Planner Retreat at Happy Valley Farms. Here’s a summary of what you shared:</p>' +
+    '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0;">' +
+    tableRows +
+    '</table>' +
+    '<p style="font-size:15px;line-height:1.6;margin:18px 0 0;color:#5a655c;">Need to make a change? You can update your RSVP any time before the deadline.</p>' +
+    emailButton('Edit My RSVP', link) +
+    '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:0;">Please finalize by July 13th.</p>';
+
+  MailApp.sendEmail({
+    to: att.email,
+    name: 'Happy Valley Farms',
+    subject: 'Your RSVP — Event Planner Retreat at Happy Valley Farms',
+    htmlBody: emailShell(inner),
+    body:
+      'Thank you, ' + first + '. We’ve received your RSVP for the Event Planner Retreat at ' +
+      'Happy Valley Farms. You can review or edit it any time before July 13th here: ' + link,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Installable On-Edit trigger: send an invite when send_invite is checked.
+// ---------------------------------------------------------------------------
+function onSheetEdit(e) {
+  try {
+    var range = e && e.range;
+    if (!range) return;
+    var sheet = range.getSheet();
+    if (sheet.getName() !== SHEET_NAME) return;
+    var row = range.getRow();
+    if (row === 1) return; // header
+
+    var header = sheet
+      .getRange(1, 1, 1, sheet.getLastColumn())
+      .getValues()[0]
+      .map(function (h) { return normalizeHeader(String(h)); });
+
+    var siCol = colIndex(header, 'send_invite');
+    if (siCol < 0) return;
+    if (range.getColumn() !== siCol + 1) return; // edit wasn't the send_invite column
+    if (range.getValue() !== true) return; // only act when it becomes checked
+
+    var rowValues = sheet.getRange(row, 1, 1, header.length).getValues()[0];
+    var att = rowToAttendee(header, rowValues);
+    if (!att.email) return;
+
+    // If an invite_sent_at column exists and is already filled, don't resend.
+    var sentCol = colIndex(header, 'invite_sent_at');
+    if (sentCol >= 0 && String(rowValues[sentCol] || '').trim() !== '') return;
+
+    sendInviteEmail(att);
+
+    if (sentCol >= 0) {
+      sheet.getRange(row, sentCol + 1).setValue(new Date().toISOString());
+    }
+  } catch (err) {
+    if (typeof console !== 'undefined' && console.log) console.log('onSheetEdit error: ' + err);
   }
 }
