@@ -5,8 +5,7 @@ import type { Attendee } from '@/types/rsvp';
 import { RETREAT } from '@/lib/retreat';
 import Itinerary from '@/components/Itinerary';
 import RsvpForm from '@/components/RsvpForm';
-
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH || '';
+import { getBasePath } from '@/lib/basePath';
 
 type View = 'loading' | 'lookup' | 'found';
 
@@ -42,7 +41,7 @@ export default function Page() {
 
   async function lookup(email: string): Promise<Attendee | null> {
     const qs = new URLSearchParams({ email });
-    const res = await fetch(`${BASE}/api/rsvp/lookup?${qs.toString()}`);
+    const res = await fetch(`${getBasePath()}/api/rsvp/lookup?${qs.toString()}`);
     const data = await res.json();
     if (res.ok && data.ok) return data.attendee as Attendee;
     if (res.status === 404) return null;

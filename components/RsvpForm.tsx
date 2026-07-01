@@ -4,9 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Attendee, RsvpResponses, ActivityResponses } from '@/types/rsvp';
 import { emptyResponses } from '@/types/rsvp';
 import { ACTIVITIES, ARRIVAL_DATES, DEPARTURE_DATES, type ActivityItem } from '@/lib/retreat';
+import { getBasePath } from '@/lib/basePath';
 import FormStep, { RadioGroup, TextField, TextArea } from './FormStep';
-
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 const ATTENDING = 'Attending';
 const UNABLE = 'Unable to Attend';
@@ -133,7 +132,7 @@ export default function RsvpForm({
     setSaving(true);
     setError('');
     try {
-      const res = await fetch(`${BASE}/api/rsvp/submit`, {
+      const res = await fetch(`${getBasePath()}/api/rsvp/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
