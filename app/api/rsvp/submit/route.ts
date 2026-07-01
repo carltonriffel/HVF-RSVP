@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { submitResponses } from '@/lib/googleSheets';
+import { submitResponses, safeErrorCode } from '@/lib/googleSheets';
 import { emptyResponses } from '@/types/rsvp';
 import type { ApiError, RsvpResponses, SubmitBody, SubmitSuccess } from '@/types/rsvp';
 
@@ -67,13 +67,13 @@ export async function POST(request: NextRequest) {
       message: 'Your RSVP has been received.',
     });
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    console.error('submit error:', detail);
+    // Full message (may include the Apps Script URL) stays in the server log only.
+    console.error('submit error:', err instanceof Error ? err.message : String(err));
     return NextResponse.json(
       {
         ok: false,
         error: 'We could not save your RSVP. Your answers are safe — please try again.',
-        detail,
+        code: safeErrorCode(err),
       },
       { status: 500 }
     );

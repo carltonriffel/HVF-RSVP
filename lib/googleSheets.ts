@@ -15,6 +15,18 @@ export interface Identifier {
   email?: string;
 }
 
+/**
+ * Map an error to a non-sensitive category code safe to return to the browser.
+ * The raw message (which may contain the Apps Script URL) stays server-side only.
+ */
+export function safeErrorCode(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes('Missing Apps Script configuration')) return 'server_not_configured';
+  if (msg.includes('secret mismatch') || msg.includes('Unauthorized')) return 'upstream_auth_failed';
+  if (msg.includes('Unexpected response from the Apps Script')) return 'bad_upstream_response';
+  return 'upstream_error';
+}
+
 function getConfig() {
   const url = process.env.APPS_SCRIPT_URL;
   const secret = process.env.APPS_SCRIPT_SECRET;

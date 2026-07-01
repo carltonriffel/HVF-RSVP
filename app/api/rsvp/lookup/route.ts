@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { lookupAttendee } from '@/lib/googleSheets';
+import { lookupAttendee, safeErrorCode } from '@/lib/googleSheets';
 import type { ApiError, LookupSuccess } from '@/types/rsvp';
 
 // This route reads private credentials and must never be statically cached.
@@ -48,13 +48,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json<LookupSuccess>({ ok: true, attendee });
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    console.error('lookup error:', detail);
+    // Full message (may include the Apps Script URL) stays in the server log only.
+    console.error('lookup error:', err instanceof Error ? err.message : String(err));
     return NextResponse.json(
       {
         ok: false,
         error: 'Something went wrong looking up your invitation. Please try again.',
-        detail,
+        code: safeErrorCode(err),
       },
       { status: 500 }
     );
