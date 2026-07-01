@@ -11,6 +11,8 @@ const ATTENDING = 'Attending';
 const UNABLE = 'Unable to Attend';
 const PARTIAL = 'Partial Attendance';
 
+const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
+
 type StepId =
   | 'attendance'
   | 'transportation'
@@ -92,8 +94,6 @@ export default function RsvpForm({
     if (days === 'Tuesday') return ACTIVITIES.filter((a) => a.day === 'Tue');
     return ACTIVITIES; // Both Days, or unspecified
   }, [responses.attendingDays]);
-
-  const needsHotel = responses.needHotel === 'Yes';
 
   // ------- navigation -------
   function validateStep(step: StepId): string {
@@ -179,6 +179,17 @@ export default function RsvpForm({
         >
           Edit submission
         </button>
+        <p className="welcome-copy" style={{ marginTop: '1.4rem', fontSize: '0.98rem' }}>
+          Follow along at{' '}
+          <a
+            href="https://www.happyvalleyfarms.com/follow"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#14311f', fontWeight: 600 }}
+          >
+            happyvalleyfarms.com/follow
+          </a>
+        </p>
       </section>
     );
   }
@@ -265,38 +276,13 @@ export default function RsvpForm({
               onChange={(v) => setField('phone', formatPhone(v))}
             />
           </div>
-          <div className="field">
-            <span className="field-label">Mailing address</span>
-            <span className="hint">Where we can send any physical mail or details.</span>
-          </div>
-          <TextField
-            label="Street address"
-            autoComplete="address-line1"
-            value={responses.street}
-            onChange={(v) => setField('street', v)}
+          <RadioGroup
+            label="Shirt / pullover size"
+            name="shirtSize"
+            options={SHIRT_SIZES}
+            value={responses.shirtSize}
+            onChange={(v) => setField('shirtSize', v)}
           />
-          <TextField
-            label="Apt / Suite (optional)"
-            autoComplete="address-line2"
-            value={responses.street2}
-            onChange={(v) => setField('street2', v)}
-          />
-          <div className="field-grid">
-            <TextField
-              label="City & State"
-              autoComplete="address-level2"
-              placeholder="Chattanooga, TN"
-              value={responses.cityState}
-              onChange={(v) => setField('cityState', v)}
-            />
-            <TextField
-              label="ZIP"
-              autoComplete="postal-code"
-              placeholder="37402"
-              value={responses.zip}
-              onChange={(v) => setField('zip', v)}
-            />
-          </div>
         </FormStep>
       )}
 
@@ -352,21 +338,12 @@ export default function RsvpForm({
           note="On-site accommodations are limited. Rooms at the mansion and cabin will be assigned by Happy Valley Farms, with priority given to out-of-town planners."
         >
           <RadioGroup
-            label="Do you need on-site lodging or a hotel room?"
-            name="needHotel"
+            label="Do you need overnight accommodations?"
+            name="lodgingNeeded"
             options={['Yes', 'No']}
-            value={responses.needHotel}
-            onChange={(v) => setField('needHotel', v as RsvpResponses['needHotel'])}
+            value={responses.lodgingNeeded}
+            onChange={(v) => setField('lodgingNeeded', v as RsvpResponses['lodgingNeeded'])}
           />
-          {needsHotel && (
-            <RadioGroup
-              label="Preferred lodging style"
-              name="preferredLodging"
-              options={['Mansion', 'Cabin', 'No preference', 'Edwin Hotel (Chattanooga)']}
-              value={responses.preferredLodging}
-              onChange={(v) => setField('preferredLodging', v)}
-            />
-          )}
           <TextArea
             label="Accommodation Notes"
             hint="Room or accessibility needs, mobility considerations, roommate preferences, or anything else about your stay."
@@ -428,6 +405,23 @@ export default function RsvpForm({
             options={['Yes', 'No', 'No preference']}
             value={responses.alcoholPreference}
             onChange={(v) => setField('alcoholPreference', v)}
+          />
+          <TextArea
+            label="What's something unique about you?"
+            value={responses.uniqueAboutYou}
+            onChange={(v) => setField('uniqueAboutYou', v)}
+          />
+          <TextArea
+            label="Why are you excited to attend the retreat?"
+            value={responses.whyExcited}
+            onChange={(v) => setField('whyExcited', v)}
+          />
+          <TextField
+            label="Social handles"
+            hint="If you'd like to be tagged in any content (Instagram, TikTok, etc.)."
+            placeholder="@yourhandle"
+            value={responses.socialMedia}
+            onChange={(v) => setField('socialMedia', v)}
           />
           <TextArea
             label="Anything else the Happy Valley Farms team should know?"
@@ -553,13 +547,6 @@ function ReviewSummary({
   shownActivities: ActivityItem[];
   notAttending: boolean;
 }) {
-  const address = [
-    responses.street,
-    responses.street2,
-    [responses.cityState, responses.zip].filter(Boolean).join(' '),
-  ]
-    .filter(Boolean)
-    .join(', ');
   return (
     <div className="summary">
       <div className="summary-group">
@@ -569,7 +556,7 @@ function ReviewSummary({
         <Row k="Email" v={responses.email} />
         <Row k="Phone" v={responses.phone} />
         {responses.industry ? <Row k="Industry" v={responses.industry} /> : null}
-        {address ? <Row k="Mailing address" v={address} /> : null}
+        {responses.shirtSize ? <Row k="Shirt size" v={responses.shirtSize} /> : null}
       </div>
 
       <div className="summary-group">
@@ -593,10 +580,7 @@ function ReviewSummary({
 
           <div className="summary-group">
             <h3>Accommodation</h3>
-            <Row k="Needs lodging / hotel" v={responses.needHotel} />
-            {responses.preferredLodging ? (
-              <Row k="Preferred lodging" v={responses.preferredLodging} />
-            ) : null}
+            <Row k="Overnight accommodations" v={responses.lodgingNeeded} />
             {responses.accommodationNotes ? (
               <Row k="Accommodation notes" v={responses.accommodationNotes} />
             ) : null}
@@ -618,6 +602,9 @@ function ReviewSummary({
         ) : null}
         {responses.foodAllergies ? <Row k="Food allergies" v={responses.foodAllergies} /> : null}
         <Row k="Alcohol preference" v={responses.alcoholPreference} />
+        {responses.uniqueAboutYou ? <Row k="Something unique" v={responses.uniqueAboutYou} /> : null}
+        {responses.whyExcited ? <Row k="Excited to attend" v={responses.whyExcited} /> : null}
+        {responses.socialMedia ? <Row k="Social handles" v={responses.socialMedia} /> : null}
         {responses.miscNote ? <Row k="Additional notes" v={responses.miscNote} /> : null}
       </div>
     </div>

@@ -38,10 +38,7 @@ export interface RsvpResponses {
   email: string; // primary_email
   phone: string; // phone
   industry: string; // Industry (Wedding / Corporate / Both)
-  street: string; // Street
-  street2: string; // Stree 2 (street line 2 / apt / suite)
-  cityState: string; // city_state
-  zip: string; // zip_code
+  shirtSize: string; // shirt_size
 
   // Attendance
   rsvpStatus: string; // rsvp_status
@@ -57,8 +54,7 @@ export interface RsvpResponses {
   parkingShuttleNotes: string; // parking_shuttle_notes
 
   // Accommodation
-  needHotel: YesNo; // need_hotel (checkbox -> true/false)
-  preferredLodging: string; // preferred_lodging
+  lodgingNeeded: YesNo; // lodging_needed (checkbox -> true/false)
   accommodationNotes: string; // accommodation_notes (room/accessibility/mobility/roommate)
 
   // Activities
@@ -68,6 +64,11 @@ export interface RsvpResponses {
   foodRestrictions: string; // food_restrictions
   foodAllergies: string; // food_allergies
   alcoholPreference: string; // alcohol_preference
+
+  // Getting to know you
+  uniqueAboutYou: string; // unique_about_you
+  whyExcited: string; // why_excited
+  socialMedia: string; // social_media
   miscNote: string; // misc_note
 }
 
@@ -110,10 +111,7 @@ export function emptyResponses(): RsvpResponses {
     email: '',
     phone: '',
     industry: '',
-    street: '',
-    street2: '',
-    cityState: '',
-    zip: '',
+    shirtSize: '',
     rsvpStatus: '',
     attendingDays: '',
     arrivalDate: '',
@@ -123,8 +121,7 @@ export function emptyResponses(): RsvpResponses {
     departureTime: '',
     needTransportation: '',
     parkingShuttleNotes: '',
-    needHotel: '',
-    preferredLodging: '',
+    lodgingNeeded: '',
     accommodationNotes: '',
     activities: {
       picnicPaddleboarding: '',
@@ -143,6 +140,9 @@ export function emptyResponses(): RsvpResponses {
     foodRestrictions: '',
     foodAllergies: '',
     alcoholPreference: '',
+    uniqueAboutYou: '',
+    whyExcited: '',
+    socialMedia: '',
     miscNote: '',
   };
 }

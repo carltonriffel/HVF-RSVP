@@ -110,16 +110,18 @@ function sanitizeResponses(input: Partial<RsvpResponses>): RsvpResponses {
     ? industryInput
     : '';
 
+  const shirtInput = str(input.shirtSize);
+  const shirtSize = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'].includes(shirtInput)
+    ? shirtInput
+    : '';
+
   return {
     name: str(input.name),
     company: str(input.company),
     email,
     phone: str(input.phone),
     industry,
-    street: str(input.street),
-    street2: str(input.street2),
-    cityState: str(input.cityState),
-    zip: str(input.zip),
+    shirtSize,
     rsvpStatus: str(input.rsvpStatus),
     attendingDays: str(input.attendingDays),
     arrivalDate: str(input.arrivalDate),
@@ -129,13 +131,15 @@ function sanitizeResponses(input: Partial<RsvpResponses>): RsvpResponses {
     departureTime: str(input.departureTime),
     needTransportation: yesNo(input.needTransportation),
     parkingShuttleNotes: str(input.parkingShuttleNotes),
-    needHotel: yesNo(input.needHotel),
-    preferredLodging: str(input.preferredLodging),
+    lodgingNeeded: yesNo(input.lodgingNeeded),
     accommodationNotes: str(input.accommodationNotes),
     activities,
     foodRestrictions: str(input.foodRestrictions),
     foodAllergies: str(input.foodAllergies),
     alcoholPreference: str(input.alcoholPreference),
+    uniqueAboutYou: str(input.uniqueAboutYou),
+    whyExcited: str(input.whyExcited),
+    socialMedia: str(input.socialMedia),
     miscNote: str(input.miscNote),
   };
 }

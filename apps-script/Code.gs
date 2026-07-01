@@ -10,7 +10,7 @@
  * the response columns — admin/CRM columns (address, gift, num_invited,
  * sv_notes, ty_note_sent, etc.) are never touched.
  *
- * need_hotel and need_transportation are stored as true/false checkboxes.
+ * lodging_needed and need_transportation are stored as true/false checkboxes.
  *
  * SETUP (about 5 minutes):
  *   1. Open your Google Sheet.
@@ -41,6 +41,12 @@ var SHEET_NAME = 'Invites_RSVPs';
 // in the invite & confirmation emails. Include the mount path, no trailing slash.
 // Example: 'https://your-site.com/planner-rsvp'
 var APP_URL = 'https://www.happyvalleyfarms.com/planner-rsvp';
+
+// Emails are sent with this address as the reply-to, and as the visible "From"
+// when it's configured as a "Send mail as" alias on the sending Google account
+// (Gmail → Settings → Accounts → Send mail as). Otherwise the From falls back to
+// the account's own address, but reply-to still points here.
+var SENDER_EMAIL = 'stephanie@happyvalleyfarms.com';
 
 // ---------------------------------------------------------------------------
 // Entry points
@@ -114,6 +120,21 @@ function cell(header, row, name) {
 function rawCell(header, row, name) {
   var i = colIndex(header, name);
   return i >= 0 ? row[i] : '';
+}
+
+/**
+ * Read a cell that should be a free-text time. Google Sheets often auto-converts
+ * a typed time ("9:30 AM") into a Date value; format those back to a clean
+ * "h:mm a" string so the form pre-fills correctly instead of a long date.
+ */
+function timeCell(header, row, name) {
+  var i = colIndex(header, name);
+  if (i < 0) return '';
+  var v = row[i];
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'h:mm a');
+  }
+  return v != null ? String(v).trim() : '';
 }
 
 /** Value from the first matching header name (handles renamed/typo'd columns). */
@@ -191,21 +212,17 @@ function rowToAttendee(header, row) {
       email: c('primary_email'),
       phone: c('phone'),
       industry: c('industry'),
-      street: cellAny(header, row, ['street', 'address']),
-      street2: cellAny(header, row, ['street_2', 'stree_2', 'apt']),
-      cityState: c('city_state'),
-      zip: cellAny(header, row, ['zip_code', 'zip']),
+      shirtSize: c('shirt_size'),
       rsvpStatus: c('rsvp_status'),
       attendingDays: c('attending_days'),
       arrivalDate: c('arrival_date'),
-      arrivalTime: c('arrival_time'),
+      arrivalTime: timeCell(header, row, 'arrival_time'),
       travelMode: c('travel_mode'),
       departureDate: c('departure_date'),
-      departureTime: c('departure_time'),
+      departureTime: timeCell(header, row, 'departure_time'),
       needTransportation: boolToYesNo(rawCell(header, row, 'need_transportation')),
       parkingShuttleNotes: c('parking_shuttle_notes'),
-      needHotel: boolToYesNo(rawCell(header, row, 'need_hotel')),
-      preferredLodging: c('preferred_lodging'),
+      lodgingNeeded: boolToYesNo(rawCell(header, row, 'lodging_needed')),
       accommodationNotes: c('accommodation_notes'),
       activities: {
         picnicPaddleboarding: c('picnic_paddleboarding'),
@@ -224,6 +241,9 @@ function rowToAttendee(header, row) {
       foodRestrictions: c('food_restrictions'),
       foodAllergies: c('food_allergies'),
       alcoholPreference: c('alcohol_preference'),
+      uniqueAboutYou: c('unique_about_you'),
+      whyExcited: c('why_excited'),
+      socialMedia: c('social_media'),
       miscNote: c('misc_note')
     }
   };
@@ -257,8 +277,7 @@ function doSubmit(params) {
       departure_time: r.departureTime,
       need_transportation: yesNoToBool(r.needTransportation), // checkbox
       parking_shuttle_notes: r.parkingShuttleNotes,
-      need_hotel: yesNoToBool(r.needHotel), // checkbox
-      preferred_lodging: r.preferredLodging,
+      lodging_needed: yesNoToBool(r.lodgingNeeded), // checkbox
       accommodation_notes: r.accommodationNotes,
       picnic_paddleboarding: a.picnicPaddleboarding,
       plein_air_painting: a.pleinAirPainting,
@@ -272,9 +291,13 @@ function doSubmit(params) {
       brunch_social: a.brunchSocial,
       chattanooga_shuttle_tour: a.chattanoogaShuttleTour,
       farewell_feast: a.farewellFeast,
+      shirt_size: r.shirtSize,
       food_restrictions: r.foodRestrictions,
       food_allergies: r.foodAllergies,
       alcohol_preference: r.alcoholPreference,
+      unique_about_you: r.uniqueAboutYou,
+      why_excited: r.whyExcited,
+      social_media: r.socialMedia,
       misc_note: r.miscNote
     };
 
@@ -310,10 +333,6 @@ function doSubmit(params) {
     setColAny(['company_name'], r.company);
     setColAny(['primary_email'], r.email);
     setColAny(['industry'], r.industry);
-    setColAny(['street', 'address'], r.street);
-    setColAny(['street_2', 'stree_2', 'apt'], r.street2);
-    setColAny(['city_state'], r.cityState);
-    setColAny(['zip_code', 'zip'], r.zip);
 
     // submitted_at only the first time; last_updated always.
     var now = new Date().toISOString();
@@ -405,6 +424,29 @@ function firstNameOf(name) {
   return f || 'there';
 }
 
+/**
+ * Send a branded email with SENDER_EMAIL as reply-to, and as the From address
+ * when it's an allowed "Send mail as" alias. If Gmail rejects the alias From,
+ * we resend from the account's own address (reply-to still applies).
+ */
+function sendBrandedEmail(to, subject, htmlBody, textBody) {
+  var opts = {
+    to: to,
+    name: 'Happy Valley Farms',
+    subject: subject,
+    htmlBody: htmlBody,
+    body: textBody,
+    replyTo: SENDER_EMAIL,
+    from: SENDER_EMAIL,
+  };
+  try {
+    MailApp.sendEmail(opts);
+  } catch (err) {
+    delete opts.from;
+    MailApp.sendEmail(opts);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Invite email
 // ---------------------------------------------------------------------------
@@ -423,15 +465,13 @@ function sendInviteEmail(att) {
     emailButton('RSVP Now', link) +
     '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:2px 0 0;">Kindly reply by July 13th.</p>';
 
-  MailApp.sendEmail({
-    to: att.email,
-    name: 'Happy Valley Farms',
-    subject: 'You’re Invited — Event Planner Retreat at Happy Valley Farms',
-    htmlBody: emailShell(inner),
-    body:
-      'Dear ' + first + ',\n\nYou are invited to the Event Planner Retreat at Happy Valley Farms, ' +
-      'Aug 3rd–4th. Please RSVP here: ' + link + '\n\nKindly reply by July 13th.',
-  });
+  sendBrandedEmail(
+    att.email,
+    'You’re Invited — Event Planner Retreat at Happy Valley Farms',
+    emailShell(inner),
+    'Dear ' + first + ',\n\nYou are invited to the Event Planner Retreat at Happy Valley Farms, ' +
+      'Aug 3rd–4th. Please RSVP here: ' + link + '\n\nKindly reply by July 13th.'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -453,8 +493,7 @@ function sendConfirmationEmail(att) {
   add('Departure', [r.departureDate, r.departureTime].filter(function (x) { return x; }).join(' · '));
   add('Travel', r.travelMode);
   add('Airport transportation', r.needTransportation);
-  add('Needs lodging', r.needHotel);
-  add('Preferred lodging', r.preferredLodging);
+  add('Overnight accommodations', r.lodgingNeeded);
 
   var labelMap = {
     picnicPaddleboarding: 'Picnic & Paddleboarding',
@@ -476,6 +515,7 @@ function sendConfirmationEmail(att) {
     if (A[k] === 'Yes') joining.push(labelMap[k]);
   });
   add('Joining', joining.join(', '));
+  add('Shirt size', r.shirtSize);
   add('Dietary restrictions', r.foodRestrictions);
   add('Food allergies', r.foodAllergies);
   add('Alcohol', r.alcoholPreference);
@@ -504,17 +544,17 @@ function sendConfirmationEmail(att) {
     '</table>' +
     '<p style="font-size:15px;line-height:1.6;margin:18px 0 0;color:#5a655c;">Need to make a change? You can update your RSVP any time before the deadline.</p>' +
     emailButton('Edit My RSVP', link) +
-    '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:0;">Please finalize by July 13th.</p>';
+    '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:0 0 14px;">Please finalize by July 13th.</p>' +
+    '<p style="text-align:center;font-size:14px;margin:0;color:#5a655c;">Follow along at ' +
+    '<a href="https://www.happyvalleyfarms.com/follow" style="color:#b9974f;text-decoration:none;font-weight:600;">happyvalleyfarms.com/follow</a></p>';
 
-  MailApp.sendEmail({
-    to: att.email,
-    name: 'Happy Valley Farms',
-    subject: 'Your RSVP — Event Planner Retreat at Happy Valley Farms',
-    htmlBody: emailShell(inner),
-    body:
-      'Thank you, ' + first + '. We’ve received your RSVP for the Event Planner Retreat at ' +
-      'Happy Valley Farms. You can review or edit it any time before July 13th here: ' + link,
-  });
+  sendBrandedEmail(
+    att.email,
+    'Your RSVP — Event Planner Retreat at Happy Valley Farms',
+    emailShell(inner),
+    'Thank you, ' + first + '. We’ve received your RSVP for the Event Planner Retreat at ' +
+      'Happy Valley Farms. You can review or edit it any time before July 13th here: ' + link
+  );
 }
 
 // ---------------------------------------------------------------------------
