@@ -111,6 +111,15 @@ function rawCell(header, row, name) {
   return i >= 0 ? row[i] : '';
 }
 
+/** Value from the first matching header name (handles renamed/typo'd columns). */
+function cellAny(header, row, names) {
+  for (var i = 0; i < names.length; i++) {
+    var idx = colIndex(header, names[i]);
+    if (idx >= 0) return row[idx] != null ? String(row[idx]).trim() : '';
+  }
+  return '';
+}
+
 /** Read a checkbox/boolean cell as 'Yes' / 'No' / '' (blank = unanswered). */
 function boolToYesNo(v) {
   if (v === true) return 'Yes';
@@ -173,8 +182,14 @@ function rowToAttendee(header, row) {
     phone: c('phone'),
     responses: {
       name: c('primary_name'),
+      company: c('company_name'),
       email: c('primary_email'),
       phone: c('phone'),
+      industry: c('industry'),
+      street: cellAny(header, row, ['street', 'address']),
+      street2: cellAny(header, row, ['street_2', 'stree_2', 'apt']),
+      cityState: c('city_state'),
+      zip: cellAny(header, row, ['zip_code', 'zip']),
       rsvpStatus: c('rsvp_status'),
       attendingDays: c('attending_days'),
       arrivalDate: c('arrival_date'),
@@ -273,14 +288,27 @@ function doSubmit(params) {
       setCol(name, updates[name]);
     });
 
-    // Name & email are editable, but only overwrite when the guest provided a
-    // non-blank value — never wipe the identity columns with an empty submit.
-    if (r.name != null && String(r.name).trim() !== '') {
-      setCol('primary_name', String(r.name).trim());
-    }
-    if (r.email != null && String(r.email).trim() !== '') {
-      setCol('primary_email', String(r.email).trim());
-    }
+    // Contact / company / address / industry are editable, but only overwrite
+    // when the guest provided a non-blank value — never wipe existing data with
+    // an empty submit. setColAny writes to the first matching column name.
+    var setColAny = function (names, value) {
+      if (value == null || String(value).trim() === '') return;
+      for (var k = 0; k < names.length; k++) {
+        var ci = colIndex(d.header, names[k]);
+        if (ci >= 0) {
+          rowValues[ci] = String(value).trim();
+          return;
+        }
+      }
+    };
+    setColAny(['primary_name'], r.name);
+    setColAny(['company_name'], r.company);
+    setColAny(['primary_email'], r.email);
+    setColAny(['industry'], r.industry);
+    setColAny(['street', 'address'], r.street);
+    setColAny(['street_2', 'stree_2', 'apt'], r.street2);
+    setColAny(['city_state'], r.cityState);
+    setColAny(['zip_code', 'zip'], r.zip);
 
     // submitted_at only the first time; last_updated always.
     var now = new Date().toISOString();

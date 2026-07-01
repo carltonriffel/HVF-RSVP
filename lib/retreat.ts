@@ -114,7 +114,23 @@ export const TUESDAY_ACTIVITIES = ACTIVITIES.filter((a) => a.day === 'Tue');
 
 export const RETREAT = {
   title: 'Event Planner Retreat at Happy Valley Farms',
-  subtitle: 'A private two-day gathering at Happy Valley Farms',
-  dates: 'Monday, August 3rd through Tuesday, August 4th',
+  subtitle: 'A private two-day gathering Aug 3rd–4th at Happy Valley Farms',
   deadline: 'Reply by July 13th',
 };
+
+/**
+ * Selectable arrival / departure dates for the retreat window (August 2026).
+ * `value` is what gets saved to the sheet; weekday/day drive the chip display.
+ */
+export const ARRIVAL_DATES = [
+  { value: 'Aug 2nd', weekday: 'Sun', day: '2nd' },
+  { value: 'Aug 3rd', weekday: 'Mon', day: '3rd' },
+  { value: 'Aug 4th', weekday: 'Tue', day: '4th' },
+];
+
+export const DEPARTURE_DATES = [
+  { value: 'Aug 3rd', weekday: 'Mon', day: '3rd' },
+  { value: 'Aug 4th', weekday: 'Tue', day: '4th' },
+  { value: 'Aug 5th', weekday: 'Wed', day: '5th' },
+  { value: 'Aug 6th', weekday: 'Thu', day: '6th' },
+];

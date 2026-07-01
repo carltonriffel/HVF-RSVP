@@ -100,10 +100,21 @@ function sanitizeResponses(input: Partial<RsvpResponses>): RsvpResponses {
   const emailInput = str(input.email);
   const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput) ? emailInput : '';
 
+  const industryInput = str(input.industry);
+  const industry = ['Wedding', 'Corporate', 'Both'].includes(industryInput)
+    ? industryInput
+    : '';
+
   return {
     name: str(input.name),
+    company: str(input.company),
     email,
     phone: str(input.phone),
+    industry,
+    street: str(input.street),
+    street2: str(input.street2),
+    cityState: str(input.cityState),
+    zip: str(input.zip),
     rsvpStatus: str(input.rsvpStatus),
     attendingDays: str(input.attendingDays),
     arrivalDate: str(input.arrivalDate),

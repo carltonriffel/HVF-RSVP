@@ -99,7 +99,6 @@ function Hero() {
         <span>✦</span>
       </div>
       <div className="meta">
-        <span className="dates">{RETREAT.dates}</span>
         <span className="deadline">{RETREAT.deadline}</span>
       </div>
     </header>

@@ -31,12 +31,16 @@ That's it — no Google Cloud Console or service account.
    cell **A1**; it is tab-separated, so Google fills A1 through AN1 automatically:
 
    ```
-   company_name	primary_name	primary_email	alternate_name	alternate_email	phone	location	address	apt	city_state	zip_code	formal_envelope_name	need_hotel	need_transportation	num_invited	num_rsvp	misc_note	food_restrictions	gift	gift_type	ty_note_sent	sv_notes	rsvp_status	attending_days	arrival_date	arrival_time	travel_mode	departure_date	departure_time	parking_shuttle_notes	preferred_lodging	accessibility_room_notes	roommate_notes	accommodation_notes	mobility_notes	picnic_paddleboarding	plein_air_painting	petal_party	vegetable_harvesting	helicopter_tour	progressive_dinner	night_swim	breakfast	yoga_sound_bath	brunch_social	chattanooga_shuttle_tour	farewell_feast	food_allergies	alcohol_preference	submitted_at	last_updated
+   company_name	primary_name	primary_email	phone	rsvp_status	Industry	location	Street	Street 2	city_state	zip_code	formal_envelope_name	need_hotel	need_transportation	num_invited	num_rsvp	misc_note	food_restrictions	gift	gift_type	ty_note_sent	sv_notes	attending_days	arrival_date	arrival_time	travel_mode	departure_date	departure_time	parking_shuttle_notes	preferred_lodging	accommodation_notes	picnic_paddleboarding	plein_air_painting	petal_party	vegetable_harvesting	helicopter_tour	progressive_dinner	night_swim	breakfast	yoga_sound_bath	brunch_social	chattanooga_shuttle_tour	farewell_feast	food_allergies	alcohol_preference	submitted_at	last_updated
    ```
 
-   These are columns **A through AY** (51 columns). The app reads the header row
-   as the definitive column map, so the columns can be reordered as long as the
-   names match.
+   The app reads the header row as the definitive column map, so the columns can
+   be reordered as long as the names match. The guest-facing form collects
+   `primary_name`, `company_name`, `primary_email`, `phone`, `Industry`
+   (Wedding / Corporate / Both), and the mailing address (`Street`, `Street 2`,
+   `city_state`, `zip_code`) in addition to the RSVP responses. The address
+   line-2 column is matched flexibly, so `Street 2`, `Stree 2`, or `apt` all
+   work.
 
 4. Add one row per invited guest. Fill in **primary_email** (required — this is
    how each guest is identified) and **primary_name**, plus any admin columns you

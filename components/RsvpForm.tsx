@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Attendee, RsvpResponses, ActivityResponses } from '@/types/rsvp';
 import { emptyResponses } from '@/types/rsvp';
-import { ACTIVITIES, type ActivityItem } from '@/lib/retreat';
+import { ACTIVITIES, ARRIVAL_DATES, DEPARTURE_DATES, type ActivityItem } from '@/lib/retreat';
 import FormStep, { RadioGroup, TextField, TextArea } from './FormStep';
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -43,6 +43,7 @@ export default function RsvpForm({
     ...attendee.responses,
     activities: { ...emptyResponses().activities, ...attendee.responses.activities },
     name: attendee.responses.name || attendee.name || '',
+    company: attendee.responses.company || attendee.company || '',
     email: attendee.responses.email || attendee.email || '',
     phone: formatPhone(attendee.responses.phone || attendee.phone || ''),
   }));
@@ -156,14 +157,29 @@ export default function RsvpForm({
 
   // ------- confirmation -------
   if (done) {
+    const firstName = (responses.name || attendee.name || '').trim().split(/\s+/)[0];
     return (
       <section className="card confirm center-state" ref={formRef}>
         <div className="seal">✦</div>
-        <h2>Thank you.</h2>
+        <h2>Thank you{firstName ? `, ${firstName}` : ''}.</h2>
         <p className="welcome-copy">
           Your RSVP has been received. Our team will follow up with final details, lodging
           assignments, and any transportation notes as the retreat approaches.
         </p>
+        <p className="welcome-copy" style={{ fontSize: '0.98rem', opacity: 0.85 }}>
+          Need to change something? You can update your RSVP any time.
+        </p>
+        <button
+          type="button"
+          className="btn-ghost"
+          style={{ marginTop: '0.4rem' }}
+          onClick={() => {
+            setDone(false);
+            goToStep(activeSteps.length - 1); // back to the Review step
+          }}
+        >
+          Edit submission
+        </button>
       </section>
     );
   }
@@ -196,6 +212,12 @@ export default function RsvpForm({
             onChange={(v) => setField('name', v)}
           />
           <TextField
+            label="Company"
+            autoComplete="organization"
+            value={responses.company}
+            onChange={(v) => setField('company', v)}
+          />
+          <TextField
             label="Email"
             type="email"
             inputMode="email"
@@ -213,6 +235,45 @@ export default function RsvpForm({
             value={responses.phone}
             onChange={(v) => setField('phone', formatPhone(v))}
           />
+          <RadioGroup
+            label="Which best describes your work?"
+            name="industry"
+            options={['Wedding', 'Corporate', 'Both']}
+            value={responses.industry}
+            onChange={(v) => setField('industry', v)}
+          />
+          <div className="field">
+            <span className="field-label">Mailing address</span>
+            <span className="hint">Where we can send any physical mail or details.</span>
+          </div>
+          <TextField
+            label="Street address"
+            autoComplete="address-line1"
+            value={responses.street}
+            onChange={(v) => setField('street', v)}
+          />
+          <TextField
+            label="Apt / Suite (optional)"
+            autoComplete="address-line2"
+            value={responses.street2}
+            onChange={(v) => setField('street2', v)}
+          />
+          <div className="field-grid">
+            <TextField
+              label="City & State"
+              autoComplete="address-level2"
+              placeholder="Chattanooga, TN"
+              value={responses.cityState}
+              onChange={(v) => setField('cityState', v)}
+            />
+            <TextField
+              label="ZIP"
+              autoComplete="postal-code"
+              placeholder="37402"
+              value={responses.zip}
+              onChange={(v) => setField('zip', v)}
+            />
+          </div>
           <RadioGroup
             label="Will you be joining us?"
             name="rsvpStatus"
@@ -240,20 +301,16 @@ export default function RsvpForm({
       {/* ---------------- Step: Transportation ---------------- */}
       {currentStep === 'transportation' && (
         <FormStep title="Transportation & Arrival">
-          <div className="field-grid">
-            <TextField
-              label="Arrival date"
-              placeholder="August 3"
-              value={responses.arrivalDate}
-              onChange={(v) => setField('arrivalDate', v)}
-            />
-            <TextField
-              label="Arrival time"
-              placeholder="9:30 AM"
-              value={responses.arrivalTime}
-              onChange={(v) => setField('arrivalTime', v)}
-            />
-          </div>
+          <DateTimeField
+            label="Arrival"
+            name="arrivalDate"
+            dates={ARRIVAL_DATES}
+            dateValue={responses.arrivalDate}
+            onDate={(v) => setField('arrivalDate', v)}
+            timeValue={responses.arrivalTime}
+            onTime={(v) => setField('arrivalTime', v)}
+            timePlaceholder="9:30 AM"
+          />
           <RadioGroup
             label="Travel mode"
             name="travelMode"
@@ -261,20 +318,16 @@ export default function RsvpForm({
             value={responses.travelMode}
             onChange={(v) => setField('travelMode', v)}
           />
-          <div className="field-grid">
-            <TextField
-              label="Departure date"
-              placeholder="August 4"
-              value={responses.departureDate}
-              onChange={(v) => setField('departureDate', v)}
-            />
-            <TextField
-              label="Departure time"
-              placeholder="After dinner"
-              value={responses.departureTime}
-              onChange={(v) => setField('departureTime', v)}
-            />
-          </div>
+          <DateTimeField
+            label="Departure"
+            name="departureDate"
+            dates={DEPARTURE_DATES}
+            dateValue={responses.departureDate}
+            onDate={(v) => setField('departureDate', v)}
+            timeValue={responses.departureTime}
+            onTime={(v) => setField('departureTime', v)}
+            timePlaceholder="After dinner"
+          />
           <RadioGroup
             label="Do you need transportation assistance from or to the airport?"
             name="needTransportation"
@@ -387,7 +440,6 @@ export default function RsvpForm({
         <FormStep title="Review & Submit">
           <ReviewSummary
             responses={responses}
-            company={attendee.company}
             shownActivities={notAttending ? [] : shownActivities}
             notAttending={notAttending}
           />
@@ -420,6 +472,64 @@ export default function RsvpForm({
 }
 
 // ---------------------------------------------------------------------------
+// Compact date + time picker: "August" once, day chips (weekday above the
+// date), and the time field on the same row.
+// ---------------------------------------------------------------------------
+function DateTimeField({
+  label,
+  name,
+  dates,
+  dateValue,
+  onDate,
+  timeValue,
+  onTime,
+  timePlaceholder,
+}: {
+  label: string;
+  name: string;
+  dates: { value: string; weekday: string; day: string }[];
+  dateValue: string;
+  onDate: (v: string) => void;
+  timeValue: string;
+  onTime: (v: string) => void;
+  timePlaceholder?: string;
+}) {
+  return (
+    <div className="field">
+      <span className="field-label">{label}</span>
+      <div className="datetime-row">
+        <span className="month-label">August</span>
+        <div className="day-chips" role="radiogroup" aria-label={`${label} date`}>
+          {dates.map((d) => (
+            <label className="day-chip" key={d.value}>
+              <input
+                type="radio"
+                name={name}
+                value={d.value}
+                checked={dateValue === d.value}
+                onChange={() => onDate(d.value)}
+              />
+              <span className="chip-inner">
+                <span className="wd">{d.weekday}</span>
+                <span className="dn">{d.day}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <input
+          className="time-input"
+          type="text"
+          placeholder={timePlaceholder}
+          aria-label={`${label} time`}
+          value={timeValue}
+          onChange={(e) => onTime(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Review summary
 // ---------------------------------------------------------------------------
 function Row({ k, v }: { k: string; v: string }) {
@@ -434,23 +544,30 @@ function Row({ k, v }: { k: string; v: string }) {
 
 function ReviewSummary({
   responses,
-  company,
   shownActivities,
   notAttending,
 }: {
   responses: RsvpResponses;
-  company: string;
   shownActivities: ActivityItem[];
   notAttending: boolean;
 }) {
+  const address = [
+    responses.street,
+    responses.street2,
+    [responses.cityState, responses.zip].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ');
   return (
     <div className="summary">
       <div className="summary-group">
         <h3>Guest</h3>
         <Row k="Name" v={responses.name} />
-        {company ? <Row k="Company" v={company} /> : null}
+        {responses.company ? <Row k="Company" v={responses.company} /> : null}
         <Row k="Email" v={responses.email} />
         <Row k="Phone" v={responses.phone} />
+        {responses.industry ? <Row k="Industry" v={responses.industry} /> : null}
+        {address ? <Row k="Mailing address" v={address} /> : null}
       </div>
 
       <div className="summary-group">

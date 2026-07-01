@@ -32,10 +32,16 @@ export interface ActivityResponses {
 
 /** Everything a guest can fill in or update (maps to writable sheet columns). */
 export interface RsvpResponses {
-  // Contact (editable so guests can correct what we have on file)
+  // Contact & company (editable so guests can correct what we have on file)
   name: string; // primary_name
+  company: string; // company_name
   email: string; // primary_email
   phone: string; // phone
+  industry: string; // Industry (Wedding / Corporate / Both)
+  street: string; // Street
+  street2: string; // Stree 2 (street line 2 / apt / suite)
+  cityState: string; // city_state
+  zip: string; // zip_code
 
   // Attendance
   rsvpStatus: string; // rsvp_status
@@ -100,8 +106,14 @@ export interface SubmitSuccess {
 export function emptyResponses(): RsvpResponses {
   return {
     name: '',
+    company: '',
     email: '',
     phone: '',
+    industry: '',
+    street: '',
+    street2: '',
+    cityState: '',
+    zip: '',
     rsvpStatus: '',
     attendingDays: '',
     arrivalDate: '',
