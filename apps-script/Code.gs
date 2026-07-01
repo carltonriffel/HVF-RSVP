@@ -40,7 +40,7 @@ var SHEET_NAME = 'Invites_RSVPs';
 // The PUBLIC URL of your deployed RSVP app (Webflow Cloud), used for the buttons
 // in the invite & confirmation emails. Include the mount path, no trailing slash.
 // Example: 'https://your-site.com/planner-rsvp'
-var APP_URL = 'https://happyvalleyfarms.com/planner-rsvp';
+var APP_URL = 'https://www.happyvalleyfarms.com/planner-rsvp';
 
 // ---------------------------------------------------------------------------
 // Entry points
