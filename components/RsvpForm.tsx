@@ -335,7 +335,7 @@ export default function RsvpForm({
       {currentStep === 'accommodation' && (
         <FormStep
           title="Accommodation Preferences"
-          note="On-site accommodations are limited. Rooms at the mansion and cabin will be assigned by Happy Valley Farms, with priority given to out-of-town planners."
+          note="On-site accommodations are limited and will be offered first come, first served to out-of-town guests. Everyone else who needs accommodations will be staying at The Read House in downtown Chattanooga, TN."
         >
           <RadioGroup
             label="Do you need overnight accommodations?"
