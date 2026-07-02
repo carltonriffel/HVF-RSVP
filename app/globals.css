@@ -209,7 +209,7 @@ h4 {
 }
 .itin-list li {
   display: grid;
-  grid-template-columns: 5.4rem 1fr;
+  grid-template-columns: 4.6rem 1fr;
   gap: 0.9rem;
   padding: 0.6rem 0;
   border-top: 1px dotted var(--line);
@@ -219,12 +219,18 @@ h4 {
   border-top: none;
 }
 .itin-time {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--gold);
   white-space: nowrap;
   padding-top: 0.15rem;
+}
+.itin-time .t-day {
+  opacity: 0.75;
 }
 .itin-body strong {
   font-weight: 600;
@@ -366,11 +372,10 @@ select:focus {
 .activity {
   padding: 0.85rem 0;
   border-top: 1px dotted var(--line);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  display: grid;
+  grid-template-columns: 4.6rem 1fr;
+  gap: 0.9rem;
   align-items: center;
-  justify-content: space-between;
 }
 .activity:first-of-type {
   border-top: none;
@@ -380,11 +385,24 @@ select:focus {
   font-weight: 500;
 }
 .activity .a-when {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
   font-size: 0.74rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--gold);
-  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+.activity .a-when .t-day {
+  opacity: 0.75;
+}
+.activity .a-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
 }
 .activity .choices {
   gap: 0.35rem;
@@ -632,8 +650,5 @@ button {
   }
   .summary-row .v {
     text-align: left;
-  }
-  .itin-list li {
-    grid-template-columns: 4.6rem 1fr;
   }
 }

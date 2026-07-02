@@ -461,7 +461,7 @@ function sendInviteEmail(att) {
     '<p style="text-align:center;font-style:italic;color:#5a655c;margin:0 0 22px;">A private two-day gathering · Aug 3rd–4th</p>' +
     '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">Dear ' + escapeHtml(first) + ',</p>' +
     '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">By now, a printed invitation should have arrived in your mailbox. We wanted to reach out personally — we are so glad to welcome you to Happy Valley Farms, and we can’t wait for you to experience the estate, the farm, and everything we have planned firsthand.</p>' +
-    '<p style="font-size:15px;line-height:1.6;margin:0 0 6px;color:#5a655c;"><strong style="color:#14311f;">What to expect:</strong> Two unhurried days of curated hospitality — farm-to-table dinners, paddleboarding on the river, a helicopter tour over Lula Lake, plein air painting, bouquet crafting, a poolside yoga &amp; sound bath, and the best of Chattanooga’s food and views, all in the company of fellow planners.</p>' +
+    '<p style="font-size:15px;line-height:1.6;margin:0 0 6px;color:#5a655c;"><strong style="color:#14311f;">What to expect:</strong> Two unhurried days of curated hospitality — a progressive farm-to-table dinner, a picnic and river outing, cocktails and helicopter rides, plein air painting, bouquet making, a poolside yoga &amp; sound bath, and the best of Chattanooga’s food and views, all in the company of fellow planners.</p>' +
     emailButton('RSVP Now', link) +
     '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:2px 0 0;">Kindly reply by July 13th.</p>';
 
@@ -496,18 +496,18 @@ function sendConfirmationEmail(att) {
   add('Overnight accommodations', r.lodgingNeeded);
 
   var labelMap = {
-    picnicPaddleboarding: 'Picnic & Paddleboarding',
+    picnicPaddleboarding: 'Picnic & River Outing',
     pleinAirPainting: 'Plein Air Painting',
     petalParty: 'Petal Party',
-    vegetableHarvesting: 'Vegetable Harvesting',
-    helicopterTour: 'Helicopter Tour',
-    progressiveDinner: 'Progressive Dinner',
-    nightSwim: 'Night Swim',
-    breakfast: 'Breakfast',
+    vegetableHarvesting: 'Garden Harvest',
+    progressiveDinner: 'Progressive Farm Dinner',
+    helicopterTour: 'Cocktails & Helicopter Rides',
+    nightSwim: 'Dessert & Night Swim',
+    breakfast: 'Coffee & Light Breakfast',
     yogaSoundBath: 'Yoga & Sound Bath',
     brunchSocial: 'Brunch Social',
-    chattanoogaShuttleTour: 'Chattanooga Shuttle Tour',
-    farewellFeast: 'Farewell Feast',
+    chattanoogaShuttleTour: 'Downtown Chattanooga Tour',
+    farewellFeast: 'Farewell Dinner',
   };
   var A = r.activities || {};
   var joining = [];
@@ -535,6 +535,23 @@ function sendConfirmationEmail(att) {
     })
     .join('');
 
+  var packItems = [
+    'Swimsuit, cover-up, and water shoes for outdoor activities on the TN River',
+    'Another swimsuit for the night swim',
+    'Comfortable, closed toe shoes and lightweight cocktail attire for the Farm Experience Activities as they will be outdoors in August and walking through the fields',
+    'Athletic attire and/or swimsuit for the yoga and sound bath experience',
+    'Cocktail attire for the Vendor Networking Brunch — this outfit can transition through the rest of the day on Tuesday, but you might want to wear comfortable shoes again since we will be walking/standing during the brunch and on the Chattanooga Downtown tour',
+  ];
+  var packList = packItems
+    .map(function (item) {
+      return (
+        '<li style="margin:0 0 8px;color:#26302a;font-size:14px;line-height:1.6;">' +
+        escapeHtml(item) +
+        '</li>'
+      );
+    })
+    .join('');
+
   var inner =
     '<p style="text-transform:uppercase;letter-spacing:0.22em;font-size:11px;color:#b9974f;text-align:center;margin:0 0 6px;">RSVP Received</p>' +
     '<h1 style="text-align:center;font-size:26px;font-weight:500;color:#14311f;margin:0 0 16px;">Thank you, ' + escapeHtml(first) + '.</h1>' +
@@ -545,7 +562,14 @@ function sendConfirmationEmail(att) {
     '<p style="font-size:15px;line-height:1.6;margin:18px 0 0;color:#5a655c;">Need to make a change? You can update your RSVP any time before the deadline.</p>' +
     emailButton('Edit My RSVP', link) +
     '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:0 0 14px;">Please finalize by July 13th.</p>' +
-    '<p style="text-align:center;font-size:14px;margin:0;color:#5a655c;">Follow along at ' +
+    '<div style="border-top:1px solid #e3dcc7;margin:22px 0 0;padding:20px 0 0;">' +
+    '<p style="text-transform:uppercase;letter-spacing:0.22em;font-size:11px;color:#b9974f;text-align:center;margin:0 0 6px;">Know before you go</p>' +
+    '<h2 style="text-align:center;font-size:20px;font-weight:500;color:#14311f;margin:0 0 12px;">What to Pack</h2>' +
+    '<ul style="margin:0 0 4px;padding:0 0 0 20px;">' +
+    packList +
+    '</ul>' +
+    '</div>' +
+    '<p style="text-align:center;font-size:14px;margin:18px 0 0;color:#5a655c;">Follow along at ' +
     '<a href="https://www.happyvalleyfarms.com/follow" style="color:#b9974f;text-decoration:none;font-weight:600;">happyvalleyfarms.com/follow</a></p>';
 
   sendBrandedEmail(
@@ -553,7 +577,9 @@ function sendConfirmationEmail(att) {
     'Your RSVP — Event Planner Retreat at Happy Valley Farms',
     emailShell(inner),
     'Thank you, ' + first + '. We’ve received your RSVP for the Event Planner Retreat at ' +
-      'Happy Valley Farms. You can review or edit it any time before July 13th here: ' + link
+      'Happy Valley Farms. You can review or edit it any time before July 13th here: ' + link +
+      '\n\nWhat to pack:\n' +
+      packItems.map(function (item) { return '- ' + item; }).join('\n')
   );
 }
 

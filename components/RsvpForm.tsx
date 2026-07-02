@@ -361,25 +361,26 @@ export default function RsvpForm({
         >
           {shownActivities.map((a) => (
             <div className="activity" key={a.key}>
-              <div>
+              <span className="a-when">
+                <span className="t-day">{a.day}</span>
+                <span className="t-hour">{a.time}</span>
+              </span>
+              <div className="a-main">
                 <span className="a-name">{a.label}</span>
-                <span className="a-when">
-                  {a.day} · {a.time}
-                </span>
-              </div>
-              <div className="choices" role="radiogroup" aria-label={a.label}>
-                {['Yes', 'No', 'Not Sure'].map((opt) => (
-                  <label className="choice" key={opt}>
-                    <input
-                      type="radio"
-                      name={a.key}
-                      value={opt}
-                      checked={responses.activities[a.key] === opt}
-                      onChange={() => setActivity(a.key, opt)}
-                    />
-                    <span>{opt}</span>
-                  </label>
-                ))}
+                <div className="choices" role="radiogroup" aria-label={a.label}>
+                  {['Yes', 'No', 'Not Sure'].map((opt) => (
+                    <label className="choice" key={opt}>
+                      <input
+                        type="radio"
+                        name={a.key}
+                        value={opt}
+                        checked={responses.activities[a.key] === opt}
+                        onChange={() => setActivity(a.key, opt)}
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
           ))}
