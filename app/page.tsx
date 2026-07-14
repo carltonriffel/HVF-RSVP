@@ -9,6 +9,10 @@ import { getBasePath } from '@/lib/basePath';
 
 type View = 'loading' | 'lookup' | 'found';
 
+// The RSVP window is closed. Flip this back to false to reopen the lookup/form
+// flow; everything below it stays intact.
+const RSVP_CLOSED = true;
+
 export default function Page() {
   const [view, setView] = useState<View>('loading');
   const [attendee, setAttendee] = useState<Attendee | null>(null);
@@ -20,6 +24,7 @@ export default function Page() {
   // link carries the email (e.g. ?email=guest@example.com); ?invite= is also
   // accepted as an alias for the same value.
   useEffect(() => {
+    if (RSVP_CLOSED) return; // window closed — skip lookup entirely
     const params = new URLSearchParams(window.location.search);
     const email = (params.get('email') || params.get('invite'))?.trim();
     if (!email) {
@@ -50,29 +55,35 @@ export default function Page() {
 
   return (
     <main className="wrap">
-      <Hero />
+      <Hero closed={RSVP_CLOSED} />
 
-      {view === 'loading' && <LoadingState />}
-
-      {view === 'lookup' && (
-        <LookupCard
-          onFound={(a) => {
-            setAttendee(a);
-            setView('found');
-          }}
-          runLookup={lookup}
-        />
-      )}
-
-      {view === 'found' && attendee && (
+      {RSVP_CLOSED ? (
+        <ClosedNotice />
+      ) : (
         <>
-          {formStep === 0 && (
+          {view === 'loading' && <LoadingState />}
+
+          {view === 'lookup' && (
+            <LookupCard
+              onFound={(a) => {
+                setAttendee(a);
+                setView('found');
+              }}
+              runLookup={lookup}
+            />
+          )}
+
+          {view === 'found' && attendee && (
             <>
-              <Welcome name={attendee.name} />
-              <Itinerary />
+              {formStep === 0 && (
+                <>
+                  <Welcome name={attendee.name} />
+                  <Itinerary />
+                </>
+              )}
+              <RsvpForm attendee={attendee} onStepChange={setFormStep} />
             </>
           )}
-          <RsvpForm attendee={attendee} onStepChange={setFormStep} />
         </>
       )}
 
@@ -82,7 +93,7 @@ export default function Page() {
 }
 
 // ---------------------------------------------------------------------------
-function Hero() {
+function Hero({ closed = false }: { closed?: boolean }) {
   return (
     <header className="hero">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -91,16 +102,34 @@ function Hero() {
         src="https://cdn.prod.website-files.com/65df7ac34fd99d356d984e76/6a21a1bbbdba9a37327c439b_Event%20Logo%20over%20horizontal.png"
         alt="Happy Valley Farms Event Planner Retreat"
       />
-      <p className="eyebrow">You are cordially invited</p>
+      <p className="eyebrow">{closed ? 'With gratitude' : 'You are cordially invited'}</p>
       <h1>{RETREAT.title}</h1>
       <p className="subtitle">{RETREAT.subtitle}</p>
       <div className="rule">
         <span>✦</span>
       </div>
-      <div className="meta">
-        <span className="deadline">{RETREAT.deadline}</span>
-      </div>
+      {!closed && (
+        <div className="meta">
+          <span className="deadline">{RETREAT.deadline}</span>
+        </div>
+      )}
     </header>
+  );
+}
+
+function ClosedNotice() {
+  return (
+    <section className="card center-state">
+      <p className="eyebrow section-eyebrow">RSVP Closed</p>
+      <h2>The RSVP window has closed</h2>
+      <p className="welcome-copy" style={{ marginTop: '0.75rem' }}>
+        Thank you for your interest in the Event Planner Retreat at Happy Valley Farms. Our RSVP
+        window has now closed. If you have any questions or need to update your response, please
+        reach out to{' '}
+        <a href="mailto:stephanie@happyvalleyfarms.com">stephanie@happyvalleyfarms.com</a> and our
+        team will be glad to help.
+      </p>
+    </section>
   );
 }
 

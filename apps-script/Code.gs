@@ -32,10 +32,18 @@
 
 // CHANGE THIS to your own long random string, and use the same value for
 // APPS_SCRIPT_SECRET in the Next.js app.
-var SHARED_SECRET = 'CHANGE_ME_to_a_long_random_string';
+var SHARED_SECRET = 'hvf-9f83k2-do-not-share';
 
 // The tab (worksheet) that holds invites & responses.
 var SHEET_NAME = 'Invites_RSVPs';
+
+// The tab (worksheet) that holds vendor contacts. Ticking the "Send Invite"
+// checkbox on a row sends the HVF Industry Collective Brunch invite and stamps
+// the "Last Sent" column. Columns: Company Name | Email | Category | Send Invite | Last Sent
+var VENDOR_SHEET_NAME = 'Vendor Contacts';
+
+// Where the "Reserve your spot" button in the brunch email points.
+var VENDOR_BRUNCH_URL = 'https://www.happyvalleyfarms.com/vendor-brunch';
 
 // The PUBLIC URL of your deployed RSVP app (Webflow Cloud), used for the buttons
 // in the invite & confirmation emails. Include the mount path, no trailing slash.
@@ -47,6 +55,92 @@ var APP_URL = 'https://www.happyvalleyfarms.com/planner-rsvp';
 // (Gmail → Settings → Accounts → Send mail as). Otherwise the From falls back to
 // the account's own address, but reply-to still points here.
 var SENDER_EMAIL = 'stephanie@happyvalleyfarms.com';
+
+// ---------------------------------------------------------------------------
+// Custom menu (adds "HVF Emails" to the toolbar when the sheet is opened)
+// ---------------------------------------------------------------------------
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('HVF Emails')
+    .addItem('Send brunch invite to all uninvited vendors', 'sendVendorBrunchInvitesFromMenu')
+    .addToUi();
+}
+
+/**
+ * One-click bulk send: emails the HVF Industry Collective Brunch invite to every
+ * Vendor Contacts row that has an email AND an unchecked "Send Invite" box (and
+ * no "Last Sent" stamp, so no one is emailed twice). After sending, it ticks the
+ * box and stamps "Last Sent" so that row is skipped on the next run.
+ */
+function sendVendorBrunchInvitesFromMenu() {
+  var ui = SpreadsheetApp.getUi();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(VENDOR_SHEET_NAME);
+  if (!sheet) {
+    ui.alert('Worksheet "' + VENDOR_SHEET_NAME + '" not found.');
+    return;
+  }
+
+  var values = sheet.getDataRange().getValues();
+  var header = (values[0] || []).map(function (h) { return normalizeHeader(String(h)); });
+  var rows = values.slice(1);
+
+  var siCol = colIndex(header, 'send_invite');
+  var sentCol = colIndex(header, 'last_sent');
+  if (siCol < 0) {
+    ui.alert('No "Send Invite" column found. Headers: ' + header.join(', '));
+    return;
+  }
+
+  // Figure out who would be emailed so the confirmation prompt is honest.
+  var pending = [];
+  for (var i = 0; i < rows.length; i++) {
+    if (isEmptyRow(rows[i])) continue;
+    var checked = rows[i][siCol] === true;
+    var alreadySent = sentCol >= 0 && String(rows[i][sentCol] || '').trim() !== '';
+    if (checked || alreadySent) continue; // already invited — skip
+    var email = cell(header, rows[i], 'email');
+    if (!email) continue; // no address — skip
+    pending.push({ rowNumber: i + 2, company: cell(header, rows[i], 'company_name'), email: email });
+  }
+
+  if (!pending.length) {
+    ui.alert('No vendors to invite. Every row with an email is already checked or has a "Last Sent" stamp.');
+    return;
+  }
+
+  var response = ui.alert(
+    'Send brunch invites',
+    'This will email the HVF Industry Collective Brunch invite to ' + pending.length +
+      ' vendor' + (pending.length === 1 ? '' : 's') + ' (unchecked rows with an email). ' +
+      'Each will then be checked and stamped so it is not emailed again.\n\nContinue?',
+    ui.ButtonSet.YES_NO
+  );
+  if (response !== ui.Button.YES) return;
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sent = 0;
+    var failed = [];
+    for (var j = 0; j < pending.length; j++) {
+      var p = pending[j];
+      try {
+        sendVendorInviteEmail(p.company, p.email);
+        if (siCol >= 0) sheet.getRange(p.rowNumber, siCol + 1).setValue(true);
+        if (sentCol >= 0) sheet.getRange(p.rowNumber, sentCol + 1).setValue(new Date().toISOString());
+        sent++;
+      } catch (err) {
+        Logger.log('vendor bulk ERROR (row ' + p.rowNumber + ', ' + p.email + '): ' + (err && err.stack ? err.stack : err));
+        failed.push(p.email);
+      }
+    }
+    var msg = 'Sent ' + sent + ' invite' + (sent === 1 ? '' : 's') + '.';
+    if (failed.length) msg += '\n\nFailed for: ' + failed.join(', ') + '\n(See the Apps Script logs for details.)';
+    ui.alert(msg);
+  } finally {
+    lock.releaseLock();
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Entry points
@@ -391,7 +485,11 @@ function emailShell(innerHtml) {
   var logo =
     'https://cdn.prod.website-files.com/65df7ac34fd99d356d984e76/6a21a1bbbdba9a37327c439b_Event%20Logo%20over%20horizontal.png';
   return (
-    '<div style="margin:0;padding:0;background:#0f2417;">' +
+    // Tell Apple Mail / iOS this email is designed for light only, so it stops
+    // auto-inverting our brand colors. (Gmail & Outlook strip these; harmless.)
+    '<meta name="color-scheme" content="light">' +
+    '<meta name="supported-color-schemes" content="light">' +
+    '<div style="margin:0;padding:0;background:#0f2417;color-scheme:light;">' +
     '<div style="max-width:600px;margin:0 auto;padding:26px 0;font-family:Georgia,\'Times New Roman\',serif;">' +
     '<div style="text-align:center;padding:6px 24px 18px;">' +
     '<img src="' + logo + '" alt="Happy Valley Farms" width="200" style="max-width:58%;height:auto;" />' +
@@ -460,17 +558,111 @@ function sendInviteEmail(att) {
     '<h1 style="text-align:center;font-size:26px;font-weight:500;color:#14311f;margin:0 0 4px;">Event Planner Retreat</h1>' +
     '<p style="text-align:center;font-style:italic;color:#5a655c;margin:0 0 22px;">A private two-day gathering · Aug 3rd–4th</p>' +
     '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">Dear ' + escapeHtml(first) + ',</p>' +
-    '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">By now, a printed invitation should have arrived in your mailbox. We wanted to reach out personally — we are so glad to welcome you to Happy Valley Farms, and we can’t wait for you to experience the estate, the farm, and everything we have planned firsthand.</p>' +
-    '<p style="font-size:15px;line-height:1.6;margin:0 0 6px;color:#5a655c;"><strong style="color:#14311f;">What to expect:</strong> Two unhurried days of curated hospitality — a progressive farm-to-table dinner, a picnic and river outing, cocktails and helicopter rides, plein air painting, bouquet making, a poolside yoga &amp; sound bath, and the best of Chattanooga’s food and views, all in the company of fellow planners.</p>' +
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">By now, a formal invitation should have arrived safely in your mailbox. We wanted to reach out personally to welcome you to Happy Valley Farms. We are so glad for your interest in events, agritourism, and hospitality - we can’t wait for you to experience the estate, the farm, and everything we have planned for you firsthand. Happy Valley Farms is honored to host you, and we are covering all expenses for the retreat minus your personal travel.</p>' +
+    '<p style="font-size:15px;line-height:1.6;margin:0 0 6px;color:#5a655c;"><strong style="color:#14311f;">What to expect:</strong> Two unhurried days of curated hospitality — a progressive farm-to-table dinner, a picnic and outing on the Tennessee River, cocktails and helicopter rides, plein air painting, bouquet making featuring cut flowers from our farm, a poolside yoga & sound bath wellness session, and the best of Chattanooga’s hot spots, all in the company of fellow planners and new friends.</p>' + '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;"> Please reply to Stephanie with any questions! </p>' +
     emailButton('RSVP Now', link) +
-    '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:2px 0 0;">Kindly reply by July 13th.</p>';
+    '<p style="text-align:center;font-style:italic;color:#7c2b2b;font-size:14px;margin:2px 0 0;">Kindly complete the RSVP form by July 13th.</p>';
 
   sendBrandedEmail(
     att.email,
-    'You’re Invited — Event Planner Retreat at Happy Valley Farms',
+    'You’re Invited to Our Event Planner Retreat at Happy Valley Farms',
     emailShell(inner),
     'Dear ' + first + ',\n\nYou are invited to the Event Planner Retreat at Happy Valley Farms, ' +
-      'Aug 3rd–4th. Please RSVP here: ' + link + '\n\nKindly reply by July 13th.'
+      'Aug 3rd–4th. Please RSVP here: ' + link + '\n\nKindly complete the RSVP form by July 13th.'
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HVF Industry Collective Brunch invite email
+// ---------------------------------------------------------------------------
+// Separate aesthetic from the retreat emails: an off-white outer background,
+// a full-width header image, and a clean white center card with a warm
+// light-grey border and dark-grey text. Green, rounded "Reserve" button.
+// ---------------------------------------------------------------------------
+
+/** Branded wrapper for the vendor brunch email (one continuous off-white field
+ *  with a full-width header image, the copy, and a full-width footer image). */
+function vendorEmailShell(innerHtml) {
+  var header =
+    'https://cdn.prod.website-files.com/65df7ac34fd99d356d984e76/6a50fed8146b9507ffb738ca_Brunch%20Header%20Smaller.png';
+  var footer =
+    'https://cdn.prod.website-files.com/65df7ac34fd99d356d984e76/6a50fed87ec2b21d5fa2fbf3_Brunch%20Footer%20Smaller.png';
+  return (
+    // Tell Apple Mail / iOS this email is designed for light only, so it stops
+    // auto-inverting our brand colors. (Gmail & Outlook strip these; harmless.)
+    '<meta name="color-scheme" content="light">' +
+    '<meta name="supported-color-schemes" content="light">' +
+    '<div style="margin:0;padding:0;background:#f2ede3;color-scheme:light;">' +
+    '<div style="max-width:600px;margin:0 auto;padding:0;font-family:Georgia,\'Times New Roman\',serif;background:#f2ede3;">' +
+    '<div style="padding:24px 20px 0;">' +
+    '<img src="' + header + '" alt="HVF Industry Collective Brunch" width="560" style="display:block;width:100%;max-width:100%;height:auto;" />' +
+    '</div>' +
+    '<div style="padding:30px 34px 34px;color:#3a3a3a;">' +
+    innerHtml +
+    '</div>' +
+    '<div style="padding:0 20px 24px;">' +
+    '<img src="' + footer + '" alt="Happy Valley Farms" width="560" style="display:block;width:100%;max-width:100%;height:auto;" />' +
+    '</div>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+/** Green, rounded "Reserve" button for the vendor email. */
+function vendorButton(label, url) {
+  return (
+    '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px auto 6px;">' +
+    '<tr><td style="border-radius:8px;background:#2f5d3a;">' +
+    '<a href="' + url + '" style="display:inline-block;padding:14px 36px;font-family:Georgia,serif;' +
+    'font-size:16px;color:#ffffff;text-decoration:none;font-weight:bold;letter-spacing:0.03em;">' +
+    label +
+    '</a></td></tr></table>'
+  );
+}
+
+function sendVendorInviteEmail(company, email) {
+  if (!email) return;
+  var name = String(company || '').trim() || 'there';
+
+  var tier = function (title, price, body) {
+    return (
+      '<div style="border:1px solid #e4ddce;border-radius:6px;padding:16px 18px;margin:0 0 12px;background:#faf7f0;">' +
+      '<p style="margin:0 0 6px;font-size:16px;color:#2f5d3a;font-weight:bold;">' +
+      escapeHtml(title) +
+      ' <span style="color:#8a8272;font-weight:normal;">|</span> ' +
+      '<span style="color:#3a3a3a;">' + escapeHtml(price) + '</span></p>' +
+      '<p style="margin:0;font-size:14px;line-height:1.6;color:#4a4a4a;">' + body + '</p>' +
+      '</div>'
+    );
+  };
+
+  var inner =
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">Hello ' + escapeHtml(name) + ',</p>' +
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">We would love to invite you to join us for the HVF Industry Collective Brunch during the upcoming Happy Valley Farms Planner Retreat.</p>' +
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">This invite-only retreat will bring together a curated group of event planners and industry professionals for two days of connection, inspiration, and hospitality. As part of the experience, we are hosting a relaxed brunch designed to introduce planners to local vendors and event partners in a more personal, conversation-focused setting.</p>' +
+    '<p style="font-size:16px;line-height:1.6;margin:0 0 16px;">There are two ways to participate:</p>' +
+    tier('Attend + Connect', '$75', 'Includes brunch, mimosas, and casual networking with planners, vendors, and local event partners. Please bring business cards.') +
+    tier('Attend + Display', '$125', 'Includes brunch, mimosas, and a simple vendor display setup with one 6&rsquo; table, linen, florals, and chairs provided by Happy Valley Farms.') +
+    '<p style="font-size:16px;line-height:1.6;margin:16px 0 0;">Space is limited, and we would be honored to have you join us.</p>' +
+    vendorButton('Reserve Your Spot', VENDOR_BRUNCH_URL) +
+    '<p style="font-size:16px;line-height:1.6;margin:26px 0 0;">Warmly,<br />' +
+    'Stephanie Valencia<br />' +
+    '<span style="color:#8a8272;font-size:14px;">Manager of Events &amp; Operations</span></p>';
+
+  sendBrandedEmail(
+    email,
+    'You’re Invited: HVF Industry Collective Brunch',
+    vendorEmailShell(inner),
+    'Hello ' + name + ',\n\n' +
+      'We would love to invite you to join us for the HVF Industry Collective Brunch during the ' +
+      'upcoming Happy Valley Farms Planner Retreat.\n\n' +
+      'There are two ways to participate:\n\n' +
+      'Attend + Connect | $75 — Includes brunch, mimosas, and casual networking with planners, vendors, ' +
+      'and local event partners. Please bring business cards.\n\n' +
+      'Attend + Display | $125 — Includes brunch, mimosas, and a simple vendor display setup with one 6’ ' +
+      'table, linen, florals, and chairs provided by Happy Valley Farms.\n\n' +
+      'Space is limited, and we would be honored to have you join us. Reserve your spot: ' + VENDOR_BRUNCH_URL +
+      '\n\nWarmly,\nStephanie Valencia\nManager of Events & Operations'
   );
 }
 
@@ -594,9 +786,14 @@ function onSheetEdit(e) {
       // can't tell which cell changed, so scan for checked-but-unsent invites.
       Logger.log('invite: no range on event — using scan fallback (tip: set the trigger to "On edit")');
       sendPendingInvites_();
+      sendPendingVendorInvites_();
       return;
     }
     var sheet = range.getSheet();
+    if (sheet.getName() === VENDOR_SHEET_NAME) {
+      handleVendorInviteEdit_(sheet, range);
+      return;
+    }
     if (sheet.getName() !== SHEET_NAME) {
       Logger.log('invite: edit was on sheet "' + sheet.getName() + '", not "' + SHEET_NAME + '"');
       return;
@@ -689,5 +886,109 @@ function sendPendingInvites_() {
     }
   } catch (err) {
     Logger.log('invite scan ERROR: ' + (err && err.stack ? err.stack : err));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Vendor Contacts: send the brunch invite when "Send Invite" is checked.
+// Columns: Company Name | Email | Category | Send Invite | Last Sent
+// The same onSheetEdit trigger drives this — it branches on the sheet name.
+// The "Last Sent" column is stamped so the same vendor isn't emailed twice;
+// clear that cell to allow a resend.
+// ---------------------------------------------------------------------------
+function handleVendorInviteEdit_(sheet, range) {
+  var row = range.getRow();
+  if (row === 1) return; // header
+
+  var header = sheet
+    .getRange(1, 1, 1, sheet.getLastColumn())
+    .getValues()[0]
+    .map(function (h) { return normalizeHeader(String(h)); });
+
+  var siCol = colIndex(header, 'send_invite');
+  if (siCol < 0) {
+    Logger.log('vendor: no "Send Invite" column found. Headers: ' + header.join(', '));
+    return;
+  }
+  if (range.getColumn() !== siCol + 1) {
+    Logger.log('vendor: edited column ' + range.getColumn() + ' is not Send Invite (col ' + (siCol + 1) + ')');
+    return;
+  }
+  if (range.getValue() !== true) {
+    Logger.log('vendor: Send Invite value is not checked (got: ' + range.getValue() + ')');
+    return;
+  }
+
+  var rowValues = sheet.getRange(row, 1, 1, header.length).getValues()[0];
+  var company = cell(header, rowValues, 'company_name');
+  var email = cell(header, rowValues, 'email');
+  if (!email) {
+    Logger.log('vendor: row ' + row + ' has no Email — nothing to send to');
+    return;
+  }
+
+  // Don't resend if "Last Sent" is already stamped.
+  var sentCol = colIndex(header, 'last_sent');
+  if (sentCol >= 0 && String(rowValues[sentCol] || '').trim() !== '') {
+    Logger.log('vendor: already sent to ' + email + ' (Last Sent is set)');
+    return;
+  }
+
+  Logger.log('vendor: sending brunch invite to ' + email + ' (' + company + ')');
+  sendVendorInviteEmail(company, email);
+  Logger.log('vendor: MailApp.sendEmail completed for ' + email);
+
+  if (sentCol >= 0) {
+    sheet.getRange(row, sentCol + 1).setValue(new Date().toISOString());
+  }
+}
+
+/**
+ * Fallback for "On change" triggers (no e.range): scan every Vendor Contacts
+ * row and send the brunch invite to anyone whose "Send Invite" is checked but
+ * who has no "Last Sent" stamp yet.
+ */
+function sendPendingVendorInvites_() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(VENDOR_SHEET_NAME);
+    if (!sheet) {
+      Logger.log('vendor: worksheet "' + VENDOR_SHEET_NAME + '" not found — skipping vendor scan');
+      return;
+    }
+    var values = sheet.getDataRange().getValues();
+    var header = (values[0] || []).map(function (h) { return normalizeHeader(String(h)); });
+    var rows = values.slice(1);
+
+    var siCol = colIndex(header, 'send_invite');
+    var sentCol = colIndex(header, 'last_sent');
+    if (siCol < 0) {
+      Logger.log('vendor: no "Send Invite" column found. Headers: ' + header.join(', '));
+      return;
+    }
+    if (sentCol < 0) {
+      Logger.log(
+        'vendor: the scan fallback needs a "Last Sent" column to avoid resending ' +
+          'on every change. Add that column, OR set the trigger event type to "On edit".'
+      );
+      return;
+    }
+    for (var i = 0; i < rows.length; i++) {
+      if (isEmptyRow(rows[i])) continue;
+      var checked = rows[i][siCol] === true;
+      var alreadySent = String(rows[i][sentCol] || '').trim() !== '';
+      if (!checked || alreadySent) continue;
+      var company = cell(header, rows[i], 'company_name');
+      var email = cell(header, rows[i], 'email');
+      if (!email) {
+        Logger.log('vendor: row ' + (i + 2) + ' is checked but has no Email');
+        continue;
+      }
+      Logger.log('vendor: (scan) sending to ' + email);
+      sendVendorInviteEmail(company, email);
+      sheet.getRange(i + 2, sentCol + 1).setValue(new Date().toISOString());
+      Logger.log('vendor: (scan) sent to ' + email);
+    }
+  } catch (err) {
+    Logger.log('vendor scan ERROR: ' + (err && err.stack ? err.stack : err));
   }
 }
