@@ -11,7 +11,7 @@ type View = 'loading' | 'lookup' | 'found';
 
 // The RSVP window is closed. Flip this back to false to reopen the lookup/form
 // flow; everything below it stays intact.
-const RSVP_CLOSED = true;
+const RSVP_CLOSED = false;
 
 export default function Page() {
   const [view, setView] = useState<View>('loading');
